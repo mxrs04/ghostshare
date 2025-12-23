@@ -1,12 +1,79 @@
 <script setup>
 import { ref } from 'vue'
 
-const isDragOver = ref(false)
+// --- KONFIGURATION ---
+const BACKEND_URL = "https://ghostshare-aa6g.onrender.com";
 
-function onDrop(e) {
+// --- STATE VARIABLES ---
+const isDragOver = ref(false)
+const isUploading = ref(false)
+const uploadSuccess = ref(false)
+const downloadLink = ref("")
+const errorMessage = ref("")
+const selectedDuration = ref(60) // Standard: 60 Minuten
+
+// Referenz für das versteckte Input-Feld
+const fileInput = ref(null)
+
+// --- EVENT HANDLER ---
+
+// Datei per Drag & Drop
+async function onDrop(e) {
   isDragOver.value = false
-  // Datei-Logik hier
-  console.log(e.dataTransfer.files)
+  const files = e.dataTransfer.files
+  if (files.length > 0) {
+    await uploadFile(files[0])
+  }
+}
+
+// Datei per Klick auswählen
+function onFileSelect(e) {
+  const files = e.target.files
+  if (files.length > 0) {
+    uploadFile(files[0])
+  }
+}
+
+// Upload Logik
+async function uploadFile(file) {
+  isUploading.value = true
+  errorMessage.value = ""
+  uploadSuccess.value = false
+
+  const formData = new FormData()
+  formData.append("file", file)
+  formData.append("minutes", selectedDuration.value)
+
+  try {
+    const response = await fetch(`${BACKEND_URL}/api/files/upload`, {
+      method: "POST",
+      body: formData
+    })
+
+    if (!response.ok) {
+      if (response.status === 413) throw new Error("Datei ist zu groß (Max 50MB)");
+      throw new Error("Upload fehlgeschlagen");
+    }
+
+    const data = await response.json()
+    // Download-Link zusammenbauen
+    downloadLink.value = `${BACKEND_URL}/api/files/download/${data.filename}`
+    uploadSuccess.value = true
+
+  } catch (error) {
+    console.error(error)
+    errorMessage.value = error.message || "Server antwortet nicht."
+  } finally {
+    isUploading.value = false
+    // Input zurücksetzen, damit man die gleiche Datei nochmal wählen könnte
+    if (fileInput.value) fileInput.value.value = ""
+  }
+}
+
+// Link kopieren Funktion
+function copyLink() {
+  navigator.clipboard.writeText(downloadLink.value)
+  alert("Link in die Zwischenablage kopiert!")
 }
 </script>
 
@@ -45,31 +112,81 @@ function onDrop(e) {
         <h1 class="headline">Datei senden</h1>
         <p class="subheadline">Sicherer Transfer. Automatische Löschung.</p>
 
-        <div class="upload-card">
+        <div class="upload-card" v-if="!uploadSuccess">
           <div
             class="dropzone"
-            :class="{ 'drag-over': isDragOver }"
+            :class="{ 'drag-over': isDragOver, 'uploading': isUploading }"
             @dragover.prevent="isDragOver = true"
             @dragleave.prevent="isDragOver = false"
             @drop.prevent="onDrop"
+            @click="fileInput.click()"
           >
+            <input
+              type="file"
+              ref="fileInput"
+              style="display: none"
+              @change="onFileSelect"
+            >
+
             <div class="dropzone-content">
-              <span class="cloud-icon">☁️</span>
-              <p>Klicken oder Datei ziehen</p>
+              <span class="cloud-icon" v-if="!isUploading">☁️</span>
+              <span class="cloud-icon spin" v-else>⏳</span>
+
+              <p v-if="!isUploading">Klicken oder Datei ziehen</p>
+              <p v-else>Wird hochgeladen...</p>
             </div>
           </div>
 
           <div class="settings-row">
             <span class="label">GÜLTIGKEIT:</span>
             <div class="toggle-group">
-              <button class="toggle-btn">10 Min</button>
-              <button class="toggle-btn active">1 Std</button>
-              <button class="toggle-btn">24 Std</button>
+              <button
+                class="toggle-btn"
+                :class="{ active: selectedDuration === 10 }"
+                @click="selectedDuration = 10"
+              >10 Min</button>
+              <button
+                class="toggle-btn"
+                :class="{ active: selectedDuration === 60 }"
+                @click="selectedDuration = 60"
+              >1 Std</button>
+              <button
+                class="toggle-btn"
+                :class="{ active: selectedDuration === 1440 }"
+                @click="selectedDuration = 1440"
+              >24 Std</button>
             </div>
           </div>
 
-          <button class="start-btn">Transfer starten</button>
+          <p v-if="errorMessage" class="error-msg">{{ errorMessage }}</p>
+
+          <button
+            class="start-btn"
+            @click="fileInput.click()"
+            :disabled="isUploading"
+          >
+            {{ isUploading ? 'Bitte warten...' : 'Datei auswählen' }}
+          </button>
         </div>
+
+        <div class="upload-card success-card" v-else>
+          <div class="success-content">
+            <div class="success-icon">🎉</div>
+            <h2 class="success-title">Upload erfolgreich!</h2>
+            <p class="success-desc">Deine Datei ist jetzt online.</p>
+
+            <div class="link-box">
+              {{ downloadLink }}
+            </div>
+
+            <button class="start-btn" @click="copyLink">Link kopieren</button>
+
+            <button class="reset-btn" @click="uploadSuccess = false">
+              Weitere Datei senden
+            </button>
+          </div>
+        </div>
+
       </div>
     </main>
   </div>
@@ -143,7 +260,6 @@ function onDrop(e) {
   border-radius: 8px;
   font-size: 14px;
   font-weight: 600;
-  /* DUNKLES GRAU statt helles Grau für bessere Lesbarkeit */
   color: #334155;
   cursor: pointer;
   text-align: left;
@@ -176,19 +292,15 @@ function onDrop(e) {
   align-items: center;
   width: 100%;
   height: 100%;
-  background-color: #f8fafc; /* Heller Hintergrund */
+  background-color: #f8fafc;
 }
 
 .background-pattern {
   position: absolute;
   top: 0; left: 0; right: 0; bottom: 0;
   z-index: 0;
-
-  /* BALANCE: Nicht zu dunkel, nicht zu hell (#cbd5e1 ist Slate-300) */
   background-image: radial-gradient(#cbd5e1 1.5px, transparent 1.5px);
   background-size: 24px 24px;
-
-  /* Vignette bleibt, damit der Fokus mittig ist */
   mask-image: radial-gradient(circle at center, black 50%, transparent 100%);
   -webkit-mask-image: radial-gradient(circle at center, black 50%, transparent 100%);
 }
@@ -218,7 +330,6 @@ function onDrop(e) {
 }
 
 .upload-card {
-  /* FAST UNDURCHSICHTIG (0.95), damit der Text lesbar bleibt */
   background: rgba(255, 255, 255, 0.95);
   backdrop-filter: blur(10px);
   padding: 32px;
@@ -227,6 +338,7 @@ function onDrop(e) {
     0 10px 30px -5px rgba(0, 0, 0, 0.05),
     0 4px 6px -2px rgba(0, 0, 0, 0.02);
   border: 1px solid rgba(255, 255, 255, 0.8);
+  transition: height 0.3s ease;
 }
 
 .dropzone {
@@ -247,6 +359,12 @@ function onDrop(e) {
   background-color: #eff6ff;
 }
 
+.dropzone.uploading {
+  cursor: wait;
+  opacity: 0.7;
+  pointer-events: none;
+}
+
 .dropzone-content {
   color: #64748b;
   display: flex;
@@ -258,6 +376,14 @@ function onDrop(e) {
 .cloud-icon {
   font-size: 40px;
   color: #94a3b8;
+}
+
+.cloud-icon.spin {
+  animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+  100% { transform: rotate(360deg); }
 }
 
 .settings-row {
@@ -315,9 +441,73 @@ function onDrop(e) {
   box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
 }
 
-.start-btn:hover {
+.start-btn:hover:not(:disabled) {
   background-color: #1e293b;
   transform: translateY(-1px);
+}
+
+.start-btn:disabled {
+  opacity: 0.7;
+  cursor: not-allowed;
+}
+
+.error-msg {
+  color: #ef4444;
+  font-size: 12px;
+  margin-bottom: 16px;
+  background: #fef2f2;
+  padding: 8px;
+  border-radius: 8px;
+}
+
+/* SUCCESS STATE STYLES */
+.success-content {
+  text-align: center;
+  padding: 10px 0;
+}
+
+.success-icon {
+  font-size: 48px;
+  margin-bottom: 16px;
+}
+
+.success-title {
+  color: #0f172a;
+  font-size: 24px;
+  font-weight: 700;
+  margin: 0 0 8px 0;
+}
+
+.success-desc {
+  color: #64748b;
+  font-size: 14px;
+  margin-bottom: 24px;
+}
+
+.link-box {
+  background: #f1f5f9;
+  padding: 12px;
+  border-radius: 10px;
+  border: 1px solid #e2e8f0;
+  color: #334155;
+  font-family: monospace;
+  font-size: 12px;
+  word-break: break-all;
+  margin-bottom: 24px;
+}
+
+.reset-btn {
+  margin-top: 16px;
+  background: none;
+  border: none;
+  color: #64748b;
+  font-size: 13px;
+  cursor: pointer;
+  text-decoration: underline;
+}
+
+.reset-btn:hover {
+  color: #0f172a;
 }
 
 /* --- MOBILE --- */
