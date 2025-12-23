@@ -1,6 +1,6 @@
 <script setup>
-import { ref } from 'vue'
-import QrcodeVue from 'qrcode.vue' // Import für den QR-Code
+import { ref, onMounted, computed } from 'vue'
+import QrcodeVue from 'qrcode.vue'
 
 // --- KONFIGURATION ---
 const BACKEND_URL = "https://ghostshare-aa6g.onrender.com";
@@ -10,10 +10,36 @@ const isDarkMode = ref(false)
 const isDragOver = ref(false)
 const isUploading = ref(false)
 const uploadSuccess = ref(false)
-const downloadLink = ref("")
+const downloadLink = ref("") // Link zur Datei (API)
+const shareLink = ref("")    // Link zur Webseite (Frontend)
 const errorMessage = ref("")
 const selectedDuration = ref(60)
 const fileInput = ref(null)
+
+// Download Mode State (für den Empfänger)
+const isDownloadMode = ref(false)
+const receivedFilename = ref("")
+const receivedFileUrl = ref("")
+const isImage = ref(false)
+
+// --- LIFECYCLE ---
+onMounted(() => {
+  // Prüfen, ob wir im Empfänger-Modus sind (URL hat ?f=filename)
+  const urlParams = new URLSearchParams(window.location.search)
+  const fileParam = urlParams.get('f')
+
+  if (fileParam) {
+    isDownloadMode.value = true
+    receivedFilename.value = fileParam
+    receivedFileUrl.value = `${BACKEND_URL}/api/files/download/${fileParam}`
+
+    // Einfacher Check ob es ein Bild ist (für Vorschau)
+    const ext = fileParam.split('.').pop().toLowerCase()
+    if (['jpg', 'jpeg', 'png', 'gif', 'webp'].includes(ext)) {
+      isImage.value = true
+    }
+  }
+})
 
 // --- FUNKTIONEN ---
 
@@ -53,7 +79,13 @@ async function uploadFile(file) {
     }
 
     const data = await response.json()
+
+    // 1. Der direkte Link zur Datei (für den Download Button)
     downloadLink.value = `${BACKEND_URL}/api/files/download/${data.filename}`
+
+    // 2. Der Link zur Webseite (für den QR Code)
+    shareLink.value = `${window.location.origin}/?f=${data.filename}`
+
     uploadSuccess.value = true
 
   } catch (error) {
@@ -66,8 +98,13 @@ async function uploadFile(file) {
 }
 
 function copyLink() {
-  navigator.clipboard.writeText(downloadLink.value)
+  navigator.clipboard.writeText(shareLink.value)
   alert("Link kopiert!")
+}
+
+// Erzwingt den Download im Browser
+function triggerDownload() {
+  window.open(downloadLink.value || receivedFileUrl.value, '_blank')
 }
 </script>
 
@@ -77,7 +114,7 @@ function copyLink() {
 
       <aside class="sidebar">
         <div class="brand">
-          <div class="logo-icon">👻</div>
+          <div class="logo-icon">💠</div>
           <div class="brand-text">
             <div class="brand-title">GhostShare</div>
             <div class="brand-subtitle">EPHEMERAL TRANSFER</div>
@@ -85,25 +122,34 @@ function copyLink() {
         </div>
 
         <nav class="nav-menu">
-          <button class="nav-item active">
+          <button class="nav-item active" v-if="!isDownloadMode" @click="window.location.href='/'">
             <span class="icon">⚡</span>
             <span class="label-text">Neuer Transfer</span>
           </button>
-          <button class="nav-item">
+          <button class="nav-item" v-if="!isDownloadMode">
             <span class="icon">📂</span>
             <span class="label-text">Aktive Dateien</span>
+          </button>
+          <button class="nav-item" v-if="isDownloadMode" @click="window.location.href='/'">
+            <span class="icon">⬅️</span>
+            <span class="label-text">Eigene Datei senden</span>
           </button>
         </nav>
 
         <div class="theme-switch-wrapper">
           <span class="theme-label">Dark Mode</span>
-          <button class="apple-switch" :class="{ active: isDarkMode }" @click="toggleTheme">
-            <div class="switch-thumb"></div>
-          </button>
+
+          <div class="mobile-toggle-container">
+            <span class="mobile-icon sun">☀️</span>
+            <button class="apple-switch" :class="{ active: isDarkMode }" @click="toggleTheme">
+              <div class="switch-thumb"></div>
+            </button>
+            <span class="mobile-icon moon">🌙</span>
+          </div>
         </div>
 
         <div class="sidebar-footer">
-          Version 2.2 • Secure
+          Version 2.4 • Secure
         </div>
       </aside>
 
@@ -111,63 +157,90 @@ function copyLink() {
         <div class="background-pattern"></div>
 
         <div class="center-content">
-          <h1 class="headline" v-if="!uploadSuccess">Datei senden</h1>
-          <p class="subheadline" v-if="!uploadSuccess">Sicherer Transfer. Automatische Löschung.</p>
 
-          <div class="upload-card" v-if="!uploadSuccess">
-            <div
-              class="dropzone"
-              :class="{ 'drag-over': isDragOver, 'uploading': isUploading }"
-              @dragover.prevent="isDragOver = true"
-              @dragleave.prevent="isDragOver = false"
-              @drop.prevent="onDrop"
-              @click="fileInput.click()"
-            >
-              <input type="file" ref="fileInput" style="display: none" @change="onFileSelect">
-              <div class="dropzone-content">
-                <span class="cloud-icon" v-if="!isUploading">☁️</span>
-                <span class="cloud-icon spin" v-else>⏳</span>
-                <p v-if="!isUploading">Klicken oder Datei ziehen</p>
-                <p v-else>Wird hochgeladen...</p>
+          <div v-if="isDownloadMode">
+            <h1 class="headline">Datei empfangen</h1>
+            <p class="subheadline">Diese Datei löscht sich bald automatisch.</p>
+
+            <div class="upload-card success-card">
+              <div class="success-content">
+                <div v-if="isImage" class="image-preview-container">
+                  <img :src="receivedFileUrl" class="image-preview" alt="Vorschau" />
+                  <p style="font-size: 10px; color: #94a3b8; margin-top: 5px;">Gedrückt halten zum Speichern in Fotos</p>
+                </div>
+                <div v-else class="file-icon-placeholder">
+                  📄
+                </div>
+
+                <div class="link-box" style="margin-top: 20px;">{{ receivedFilename }}</div>
+
+                <button class="start-btn" @click="triggerDownload">
+                  Herunterladen
+                </button>
               </div>
             </div>
-
-            <div class="settings-row">
-              <span class="label">GÜLTIGKEIT:</span>
-              <div class="toggle-group">
-                <button class="toggle-btn" :class="{ active: selectedDuration === 10 }" @click="selectedDuration = 10">10 Min</button>
-                <button class="toggle-btn" :class="{ active: selectedDuration === 60 }" @click="selectedDuration = 60">1 Std</button>
-                <button class="toggle-btn" :class="{ active: selectedDuration === 1440 }" @click="selectedDuration = 1440">24 Std</button>
-              </div>
-            </div>
-
-            <p v-if="errorMessage" class="error-msg">{{ errorMessage }}</p>
-
-            <button class="start-btn" @click="fileInput.click()" :disabled="isUploading">
-              {{ isUploading ? 'Bitte warten...' : 'Datei auswählen' }}
-            </button>
           </div>
 
-          <div class="upload-card success-card" v-else>
-            <div class="success-content">
-              <div class="success-icon">🎉</div>
-              <h2 class="success-title">Bereit zum Teilen!</h2>
+          <div v-else>
+            <h1 class="headline" v-if="!uploadSuccess">Datei senden</h1>
+            <p class="subheadline" v-if="!uploadSuccess">Sicherer Transfer. Automatische Löschung.</p>
 
-              <div class="qr-wrapper">
-                <qrcode-vue
-                  :value="downloadLink"
-                  :size="160"
-                  level="H"
-                  :background="isDarkMode ? '#ffffff' : '#ffffff'"
-                  :foreground="'#000000'"
-                  class="qr-code"
-                />
+            <div class="upload-card" v-if="!uploadSuccess">
+              <div
+                class="dropzone"
+                :class="{ 'drag-over': isDragOver, 'uploading': isUploading }"
+                @dragover.prevent="isDragOver = true"
+                @dragleave.prevent="isDragOver = false"
+                @drop.prevent="onDrop"
+                @click="fileInput.click()"
+              >
+                <input type="file" ref="fileInput" style="display: none" @change="onFileSelect">
+                <div class="dropzone-content">
+                  <span class="cloud-icon" v-if="!isUploading">☁️</span>
+                  <span class="cloud-icon spin" v-else>⏳</span>
+                  <p v-if="!isUploading">Klicken oder Datei ziehen</p>
+                  <p v-else>Wird hochgeladen...</p>
+                </div>
               </div>
 
-              <div class="link-box">{{ downloadLink }}</div>
+              <div class="settings-row">
+                <span class="label">GÜLTIGKEIT:</span>
+                <div class="toggle-group">
+                  <button class="toggle-btn" :class="{ active: selectedDuration === 10 }" @click="selectedDuration = 10">10 Min</button>
+                  <button class="toggle-btn" :class="{ active: selectedDuration === 60 }" @click="selectedDuration = 60">1 Std</button>
+                  <button class="toggle-btn" :class="{ active: selectedDuration === 1440 }" @click="selectedDuration = 1440">24 Std</button>
+                </div>
+              </div>
 
-              <button class="start-btn" @click="copyLink">Link kopieren</button>
-              <button class="reset-btn" @click="uploadSuccess = false">Weitere Datei</button>
+              <p v-if="errorMessage" class="error-msg">{{ errorMessage }}</p>
+
+              <button class="start-btn" @click="fileInput.click()" :disabled="isUploading">
+                {{ isUploading ? 'Bitte warten...' : 'Datei auswählen' }}
+              </button>
+            </div>
+
+            <div class="upload-card success-card" v-else>
+              <div class="success-content">
+                <div class="success-icon">🎉</div>
+                <h2 class="success-title">Bereit zum Teilen!</h2>
+
+                <div class="qr-wrapper">
+                  <qrcode-vue
+                    :value="shareLink"
+                    :size="180"
+                    level="H"
+                    :background="'#ffffff'"
+                    :foreground="'#000000'"
+                    class="qr-code"
+                  />
+                </div>
+                <p style="font-size: 12px; color: #64748b; margin-bottom: 15px;">Scannen zum Öffnen</p>
+
+                <div class="link-box">{{ shareLink }}</div>
+
+                <button class="start-btn" @click="copyLink">Link kopieren</button>
+                <button class="reset-btn" @click="uploadSuccess = false">Weitere Datei</button>
+              </div>
             </div>
           </div>
 
@@ -238,7 +311,7 @@ function copyLink() {
   display: flex;
   flex-direction: column;
   padding: 32px;
-  flex-shrink: 0; /* Verhindert das Schrumpfen */
+  flex-shrink: 0;
   z-index: 50;
   transition: background-color 0.3s ease;
 }
@@ -306,7 +379,7 @@ function copyLink() {
   color: var(--text-main);
 }
 
-/* APPLE SWITCH */
+/* --- THEME TOGGLE & ICONS --- */
 .theme-switch-wrapper {
   display: flex;
   align-items: center;
@@ -321,6 +394,17 @@ function copyLink() {
   font-size: 13px;
   font-weight: 600;
   color: var(--text-main);
+}
+
+.mobile-toggle-container {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.mobile-icon {
+  display: none;
+  font-size: 16px;
 }
 
 .apple-switch {
@@ -366,10 +450,9 @@ function copyLink() {
   justify-content: center;
   align-items: center;
   width: 100%;
-  /* WICHTIG FÜR SCROLLING */
   min-height: 100vh;
   padding: 20px;
-  overflow-y: auto; /* Erlaubt Scrolling */
+  overflow-y: auto;
 }
 
 .background-pattern {
@@ -389,7 +472,7 @@ function copyLink() {
   width: 100%;
   max-width: 520px;
   text-align: center;
-  padding-bottom: 40px; /* Platz unten für Scrolling */
+  padding-bottom: 40px;
 }
 
 .headline {
@@ -519,7 +602,7 @@ function copyLink() {
   border-radius: 8px;
 }
 
-/* SUCCESS STYLES */
+/* SUCCESS / RECEIVER STYLES */
 .success-content { text-align: center; padding: 10px 0; }
 .success-title {
   color: var(--text-main);
@@ -537,14 +620,28 @@ function copyLink() {
   font-size: 12px;
   word-break: break-all;
   margin-bottom: 24px;
+  overflow-wrap: break-word;
 }
 .qr-wrapper {
   background: white;
   padding: 16px;
   border-radius: 16px;
   display: inline-block;
-  margin-bottom: 24px;
+  margin-bottom: 15px;
   box-shadow: 0 4px 6px rgba(0,0,0,0.05);
+}
+.image-preview-container {
+  margin-bottom: 20px;
+}
+.image-preview {
+  max-width: 100%;
+  max-height: 300px;
+  border-radius: 12px;
+  box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+}
+.file-icon-placeholder {
+  font-size: 60px;
+  margin-bottom: 20px;
 }
 .reset-btn {
   margin-top: 16px;
@@ -557,11 +654,10 @@ function copyLink() {
 }
 .reset-btn:hover { color: var(--text-main); }
 
-/* --- MOBILE & SCROLL FIX --- */
+/* --- MOBILE OPTIMIERUNG --- */
 @media (max-width: 768px) {
   .layout-wrapper {
     flex-direction: column;
-    /* Auf Mobile erlauben wir, dass die Höhe wächst */
     height: auto;
     overflow-y: visible;
   }
@@ -574,7 +670,7 @@ function copyLink() {
     flex-direction: row;
     justify-content: space-between;
     align-items: center;
-    position: sticky; /* Sidebar bleibt oben kleben */
+    position: sticky;
     top: 0;
   }
 
@@ -589,8 +685,11 @@ function copyLink() {
   }
   .theme-label { display: none; }
 
+  .mobile-icon {
+    display: inline-block;
+  }
+
   .main-content {
-    /* Hier ist der Fix für das Scrollen auf iOS */
     height: auto;
     min-height: calc(100vh - 70px);
     overflow-y: visible;
