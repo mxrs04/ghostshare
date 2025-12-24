@@ -1,30 +1,39 @@
 <script setup>
-import { ref, onMounted, computed } from 'vue'
+import { ref, onMounted } from 'vue'
 import QrcodeVue from 'qrcode.vue'
 
 // --- KONFIGURATION ---
 const BACKEND_URL = "https://ghostshare-aa6g.onrender.com";
 
 // --- STATE ---
-const isDarkMode = ref(false)
+// Standardmäßig auf TRUE (Dark Mode an)
+const isDarkMode = ref(true)
+
 const isDragOver = ref(false)
 const isUploading = ref(false)
 const uploadSuccess = ref(false)
-const downloadLink = ref("") // Link zur Datei (API)
-const shareLink = ref("")    // Link zur Webseite (Frontend)
+const downloadLink = ref("")
+const shareLink = ref("")
 const errorMessage = ref("")
 const selectedDuration = ref(60)
 const fileInput = ref(null)
 
-// Download Mode State (für den Empfänger)
 const isDownloadMode = ref(false)
 const receivedFilename = ref("")
 const receivedFileUrl = ref("")
 const isImage = ref(false)
 
-// --- LIFECYCLE ---
+// --- LIFECYCLE & SPEICHER-LOGIK ---
 onMounted(() => {
-  // Prüfen, ob wir im Empfänger-Modus sind (URL hat ?f=filename)
+  // 1. Theme Check: Hat der Nutzer schon mal was eingestellt?
+  const savedTheme = localStorage.getItem('ghostshare-theme')
+  if (savedTheme) {
+    isDarkMode.value = savedTheme === 'dark'
+  } else {
+    isDarkMode.value = true
+  }
+
+  // 2. Empfänger-Check (QR-Code Logik)
   const urlParams = new URLSearchParams(window.location.search)
   const fileParam = urlParams.get('f')
 
@@ -33,7 +42,6 @@ onMounted(() => {
     receivedFilename.value = fileParam
     receivedFileUrl.value = `${BACKEND_URL}/api/files/download/${fileParam}`
 
-    // Einfacher Check ob es ein Bild ist (für Vorschau)
     const ext = fileParam.split('.').pop().toLowerCase()
     if (['jpg', 'jpeg', 'png', 'gif', 'webp'].includes(ext)) {
       isImage.value = true
@@ -45,6 +53,8 @@ onMounted(() => {
 
 function toggleTheme() {
   isDarkMode.value = !isDarkMode.value
+  // Speichern der Auswahl im Browser
+  localStorage.setItem('ghostshare-theme', isDarkMode.value ? 'dark' : 'light')
 }
 
 async function onDrop(e) {
@@ -74,18 +84,13 @@ async function uploadFile(file) {
     })
 
     if (!response.ok) {
-      if (response.status === 413) throw new Error("Datei zu groß (>50MB)");
+      if (response.status === 413) throw new Error("Datei zu groß (>150MB)");
       throw new Error("Upload fehlgeschlagen");
     }
 
     const data = await response.json()
-
-    // 1. Der direkte Link zur Datei (für den Download Button)
     downloadLink.value = `${BACKEND_URL}/api/files/download/${data.filename}`
-
-    // 2. Der Link zur Webseite (für den QR Code)
     shareLink.value = `${window.location.origin}/?f=${data.filename}`
-
     uploadSuccess.value = true
 
   } catch (error) {
@@ -102,7 +107,6 @@ function copyLink() {
   alert("Link kopiert!")
 }
 
-// Erzwingt den Download im Browser
 function triggerDownload() {
   window.open(downloadLink.value || receivedFileUrl.value, '_blank')
 }
@@ -114,10 +118,14 @@ function triggerDownload() {
 
       <aside class="sidebar">
         <div class="brand">
-          <div class="logo-icon">💠</div>
+          <div class="logo-icon">
+            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" width="24" height="24">
+              <path fill-rule="evenodd" d="M12 2.25c-5.385 0-9.75 4.365-9.75 9.75v5.25c0 1.243.975 2.25 2.25 2.25h1.5a2.25 2.25 0 002.25-2.25v-1.5h3v1.5a2.25 2.25 0 002.25 2.25h1.5a2.25 2.25 0 002.25-2.25v-5.25c0-5.385-4.365-9.75-9.75-9.75zM9 10.5a1.5 1.5 0 11-3 0 1.5 1.5 0 013 0zm4.5 1.5a1.5 1.5 0 100-3 1.5 1.5 0 000 3z" clip-rule="evenodd" />
+            </svg>
+          </div>
           <div class="brand-text">
             <div class="brand-title">GhostShare</div>
-            <div class="brand-subtitle">EPHEMERAL TRANSFER</div>
+            <div class="brand-subtitle">TEMPORÄRER DATENTRANSFER</div>
           </div>
         </div>
 
@@ -149,7 +157,7 @@ function triggerDownload() {
         </div>
 
         <div class="sidebar-footer">
-          Version 2.4 • Secure
+          Version 2.6 • Secure
         </div>
       </aside>
 
@@ -166,7 +174,7 @@ function triggerDownload() {
               <div class="success-content">
                 <div v-if="isImage" class="image-preview-container">
                   <img :src="receivedFileUrl" class="image-preview" alt="Vorschau" />
-                  <p style="font-size: 10px; color: #94a3b8; margin-top: 5px;">Gedrückt halten zum Speichern in Fotos</p>
+                  <p style="font-size: 10px; color: #94a3b8; margin-top: 5px;">Gedrückt halten zum Speichern</p>
                 </div>
                 <div v-else class="file-icon-placeholder">
                   📄
@@ -325,11 +333,16 @@ function triggerDownload() {
   margin-bottom: 48px;
 }
 
+/* LOGO ICON ANPASSUNG FÜR SVG */
 .logo-icon {
-  font-size: 24px;
+  display: flex; /* Zentriert das SVG */
+  align-items: center;
+  justify-content: center;
   background: var(--nav-hover);
   padding: 8px;
   border-radius: 10px;
+  color: var(--text-main); /* SVG nimmt diese Farbe an */
+  transition: background-color 0.3s, color 0.3s;
 }
 
 .brand-title {
