@@ -119,7 +119,7 @@ function triggerDownload() {
       <aside class="sidebar">
         <div class="brand">
           <div class="logo-icon">
-            <img src="@/assets/ghost-logo.png" alt="GhostShare Logo" />
+            <img src="/apple-touch-icon.png" alt="GhostShare Logo" />
           </div>
           <div class="brand-text">
             <div class="brand-title">GhostShare</div>
