@@ -119,9 +119,7 @@ function triggerDownload() {
       <aside class="sidebar">
         <div class="brand">
           <div class="logo-icon">
-            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" width="24" height="24">
-              <path fill-rule="evenodd" d="M12 2.25c-5.385 0-9.75 4.365-9.75 9.75v5.25c0 1.243.975 2.25 2.25 2.25h1.5a2.25 2.25 0 002.25-2.25v-1.5h3v1.5a2.25 2.25 0 002.25 2.25h1.5a2.25 2.25 0 002.25-2.25v-5.25c0-5.385-4.365-9.75-9.75-9.75zM9 10.5a1.5 1.5 0 11-3 0 1.5 1.5 0 013 0zm4.5 1.5a1.5 1.5 0 100-3 1.5 1.5 0 000 3z" clip-rule="evenodd" />
-            </svg>
+            <img src="@/assets/ghost-logo.png" alt="GhostShare Logo" />
           </div>
           <div class="brand-text">
             <div class="brand-title">GhostShare</div>
@@ -157,7 +155,7 @@ function triggerDownload() {
         </div>
 
         <div class="sidebar-footer">
-          Version 2.6 • Secure
+          Version 2.7 • Secure
         </div>
       </aside>
 
@@ -333,16 +331,20 @@ function triggerDownload() {
   margin-bottom: 48px;
 }
 
-/* LOGO ICON ANPASSUNG FÜR SVG */
+/* LOGO ICON ANPASSUNG FÜR BILD */
 .logo-icon {
-  display: flex; /* Zentriert das SVG */
-  align-items: center;
-  justify-content: center;
   background: var(--nav-hover);
   padding: 8px;
   border-radius: 10px;
-  color: var(--text-main); /* SVG nimmt diese Farbe an */
-  transition: background-color 0.3s, color 0.3s;
+  transition: background-color 0.3s;
+  width: 40px; /* Beispielgröße */
+  height: 40px;
+}
+
+.logo-icon img {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
 }
 
 .brand-title {
