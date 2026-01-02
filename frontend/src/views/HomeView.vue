@@ -1,59 +1,60 @@
 <script setup>
 import { ref, onMounted } from 'vue'
 import QrcodeVue from 'qrcode.vue'
-
-// --- KONFIGURATION ---
-const BACKEND_URL = "https://ghostshare-aa6g.onrender.com";
+import { upload } from '@vercel/blob/client'; // WICHTIG: Das neue Upload Tool
 
 // --- STATE ---
-// Standardmäßig auf TRUE (Dark Mode an)
 const isDarkMode = ref(true)
-
 const isDragOver = ref(false)
 const isUploading = ref(false)
 const uploadSuccess = ref(false)
-const downloadLink = ref("")
 const shareLink = ref("")
 const errorMessage = ref("")
 const selectedDuration = ref(60)
 const fileInput = ref(null)
 
+// Download Mode State
 const isDownloadMode = ref(false)
 const receivedFilename = ref("")
-const receivedFileUrl = ref("")
+const receivedFileUrl = ref("") // Der direkte Link zum Video/Bild im Blob
 const isImage = ref(false)
+const isVideo = ref(false) // Neu für Video Support
 
-// --- LIFECYCLE & SPEICHER-LOGIK ---
-onMounted(() => {
-  // 1. Theme Check: Hat der Nutzer schon mal was eingestellt?
+// --- LIFECYCLE ---
+onMounted(async () => {
+  // Theme laden
   const savedTheme = localStorage.getItem('ghostshare-theme')
-  if (savedTheme) {
-    isDarkMode.value = savedTheme === 'dark'
-  } else {
-    isDarkMode.value = true
-  }
+  if (savedTheme) isDarkMode.value = savedTheme === 'dark'
 
-  // 2. Empfänger-Check (QR-Code Logik)
+  // URL Check (?f=...)
   const urlParams = new URLSearchParams(window.location.search)
   const fileParam = urlParams.get('f')
 
   if (fileParam) {
     isDownloadMode.value = true
     receivedFilename.value = fileParam
-    receivedFileUrl.value = `${BACKEND_URL}/api/files/download/${fileParam}`
 
-    const ext = fileParam.split('.').pop().toLowerCase()
-    if (['jpg', 'jpeg', 'png', 'gif', 'webp'].includes(ext)) {
-      isImage.value = true
+    // Wir fragen unsere neue API nach dem echten Download-Link
+    try {
+      const res = await fetch(`/api/download?f=${encodeURIComponent(fileParam)}`);
+      if (!res.ok) throw new Error("Datei nicht gefunden");
+      const data = await res.json();
+
+      receivedFileUrl.value = data.url; // Das ist der Vercel Blob Link
+
+      const ext = data.filename.split('.').pop().toLowerCase();
+      if (['jpg', 'jpeg', 'png', 'gif', 'webp'].includes(ext)) isImage.value = true;
+      if (['mp4', 'mov', 'webm'].includes(ext)) isVideo.value = true;
+
+    } catch (e) {
+      errorMessage.value = "Datei existiert nicht mehr.";
     }
   }
 })
 
 // --- FUNKTIONEN ---
-
 function toggleTheme() {
   isDarkMode.value = !isDarkMode.value
-  // Speichern der Auswahl im Browser
   localStorage.setItem('ghostshare-theme', isDarkMode.value ? 'dark' : 'light')
 }
 
@@ -68,34 +69,40 @@ function onFileSelect(e) {
   if (files.length > 0) uploadFile(files[0])
 }
 
+// --- DER NEUE UPLOAD ---
 async function uploadFile(file) {
   isUploading.value = true
   errorMessage.value = ""
   uploadSuccess.value = false
 
-  const formData = new FormData()
-  formData.append("file", file)
-  formData.append("minutes", selectedDuration.value)
-
   try {
-    const response = await fetch(`${BACKEND_URL}/api/files/upload`, {
-      method: "POST",
-      body: formData
-    })
+    // 1. Upload direkt zu Vercel Blob (Client Side Upload)
+    // Das umgeht alle Server-Limits!
+    const newBlob = await upload(file.name, file, {
+      access: 'public',
+      handleUploadUrl: '/api/blob-upload', // Wir brauchen noch eine kleine Helper-Route (siehe unten)
+    });
 
-    if (!response.ok) {
-      if (response.status === 413) throw new Error("Datei zu groß (>150MB)");
-      throw new Error("Upload fehlgeschlagen");
-    }
+    // 2. Metadaten in unserer Turso DB speichern
+    const response = await fetch('/api/upload-meta', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        url: newBlob.url,
+        filename: file.name,
+        minutes: selectedDuration.value
+      })
+    });
 
-    const data = await response.json()
-    downloadLink.value = `${BACKEND_URL}/api/files/download/${data.filename}`
-    shareLink.value = `${window.location.origin}/?f=${data.filename}`
+    if (!response.ok) throw new Error("Speichern fehlgeschlagen");
+
+    // 3. Erfolg!
+    shareLink.value = `${window.location.origin}/?f=${encodeURIComponent(file.name)}`
     uploadSuccess.value = true
 
   } catch (error) {
     console.error(error)
-    errorMessage.value = error.message || "Server antwortet nicht."
+    errorMessage.value = "Upload fehlgeschlagen: " + error.message
   } finally {
     isUploading.value = false
     if (fileInput.value) fileInput.value.value = ""
@@ -108,7 +115,7 @@ function copyLink() {
 }
 
 function triggerDownload() {
-  window.open(downloadLink.value || receivedFileUrl.value, '_blank')
+  window.open(receivedFileUrl.value, '_blank')
 }
 </script>
 
