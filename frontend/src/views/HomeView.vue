@@ -69,7 +69,7 @@ function onFileSelect(e) {
   if (files.length > 0) uploadFile(files[0])
 }
 
-// --- DER NEUE UPLOAD ---
+// --- DER NEUE UPLOAD MIT FIX ---
 async function uploadFile(file) {
   isUploading.value = true
   errorMessage.value = ""
@@ -77,10 +77,10 @@ async function uploadFile(file) {
 
   try {
     // 1. Upload direkt zu Vercel Blob (Client Side Upload)
-    // Das umgeht alle Server-Limits!
     const newBlob = await upload(file.name, file, {
       access: 'public',
-      handleUploadUrl: '/api/blob-upload', // Wir brauchen noch eine kleine Helper-Route (siehe unten)
+      handleUploadUrl: '/api/blob-upload',
+      addRandomSuffix: true // <--- HIER IST DER FIX!
     });
 
     // 2. Metadaten in unserer Turso DB speichern
@@ -88,8 +88,8 @@ async function uploadFile(file) {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
-        url: newBlob.url,
-        filename: file.name,
+        url: newBlob.url,         // Die einzigartige URL vom Blob
+        filename: file.name,      // Der schöne Originalname für den User
         minutes: selectedDuration.value
       })
     });
@@ -102,6 +102,7 @@ async function uploadFile(file) {
 
   } catch (error) {
     console.error(error)
+    // Wir zeigen dem User jetzt die echte Fehlermeldung, falls was anderes schiefgeht
     errorMessage.value = "Upload fehlgeschlagen: " + error.message
   } finally {
     isUploading.value = false
