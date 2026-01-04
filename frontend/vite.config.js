@@ -6,6 +6,8 @@ import vueDevTools from 'vite-plugin-vue-devtools'
 
 // https://vite.dev/config/
 export default defineConfig({
+  // WICHTIG FÜR GITHUB PAGES: Macht alle Pfade relativ
+  base: './',
   plugins: [
     vue(),
     vueDevTools(),
