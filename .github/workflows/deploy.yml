@@ -17,10 +17,9 @@ concurrency:
 jobs:
   build:
     runs-on: ubuntu-latest
-    # HIER IST DER TRICK: Wir sagen, alles passiert im "frontend" Ordner
     defaults:
       run:
-        working-directory: ./frontend
+        working-directory: ./frontend  # <--- WICHTIG!
 
     steps:
       - name: Checkout
@@ -31,11 +30,9 @@ jobs:
         with:
           node-version: 20
           cache: 'npm'
-          # Wichtig: Cache Pfad muss auch auf den Unterordner zeigen
-          cache-dependency-path: frontend/package-lock.json
+          cache-dependency-path: frontend/package-lock.json # <--- WICHTIG!
 
       - name: Install dependencies
-        # npm ci nimmt die package-lock.json aus dem frontend ordner
         run: npm ci
 
       - name: Build
@@ -44,8 +41,7 @@ jobs:
       - name: Upload artifact
         uses: actions/upload-pages-artifact@v3
         with:
-          # Der fertige Build liegt in frontend/dist
-          path: ./frontend/dist
+          path: ./frontend/dist # <--- WICHTIG!
 
   deploy:
     environment:
