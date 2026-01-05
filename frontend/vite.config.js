@@ -5,7 +5,7 @@ import vueDevTools from 'vite-plugin-vue-devtools'
 
 // https://vite.dev/config/
 export default defineConfig({
-  base: './', // <--- DAS MUSS DRIN SEIN
+  base: '/ghostshare/', // <--- DAS MUSS DRIN SEIN
   plugins: [
     vue(),
     vueDevTools(),
