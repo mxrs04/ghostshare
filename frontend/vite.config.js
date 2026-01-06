@@ -6,15 +6,13 @@ import vueDevTools from 'vite-plugin-vue-devtools'
 
 // https://vite.dev/config/
 export default defineConfig({
-  base: '/ghostshare/', // <--- WICHTIG: Das hier muss rein! (Name deines Repos)
+  base: '/ghostshare/', // <--- WICHTIG: Dieser Slash am Anfang und Ende
   plugins: [
     vue(),
-    vueJsx(),
-    vueDevTools(),
   ],
   resolve: {
     alias: {
       '@': fileURLToPath(new URL('./src', import.meta.url))
-    },
-  },
+    }
+  }
 })
