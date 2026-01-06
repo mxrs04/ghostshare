@@ -1,15 +1,17 @@
 <script setup>
 import { ref, onMounted } from 'vue'
-import { useRouter } from 'vue-router' // Neu: Für korrekte Navigation
+import { useRouter } from 'vue-router'
 import QrcodeVue from 'qrcode.vue'
 import { upload } from '@vercel/blob/client';
 
-// --- KONFIGURATION (FIX) ---
-// Damit die App weiß, wo das Backend liegt
+// --- KONFIGURATION ---
 const BACKEND_URL = "https://ghostshare-gamma.vercel.app";
 
+// --- WICHTIG: Damit Bilder aus dem 'public' Ordner gefunden werden ---
+const publicPath = import.meta.env.BASE_URL;
+
 // --- STATE ---
-const router = useRouter() // Router Instanz nutzen
+const router = useRouter()
 const isDarkMode = ref(true)
 const isDragOver = ref(false)
 const isUploading = ref(false)
@@ -39,7 +41,6 @@ onMounted(async () => {
     receivedFilename.value = fileParam
 
     try {
-      // FIX: BACKEND_URL nutzen
       const res = await fetch(`${BACKEND_URL}/api/download?f=${encodeURIComponent(fileParam)}`);
       if (!res.ok) throw new Error("Datei nicht gefunden");
       const data = await res.json();
@@ -73,23 +74,18 @@ function onFileSelect(e) {
   if (files.length > 0) uploadFile(files[0])
 }
 
-// --- DER NEUE UPLOAD MIT FIX ---
 async function uploadFile(file) {
   isUploading.value = true
   errorMessage.value = ""
   uploadSuccess.value = false
 
   try {
-    // 1. Upload direkt zu Vercel Blob
-    // FIX: BACKEND_URL nutzen
     const newBlob = await upload(file.name, file, {
       access: 'public',
       handleUploadUrl: `${BACKEND_URL}/api/blob-upload`,
       addRandomSuffix: true
     });
 
-    // 2. Metadaten speichern
-    // FIX: BACKEND_URL nutzen
     const response = await fetch(`${BACKEND_URL}/api/upload-meta`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -102,8 +98,6 @@ async function uploadFile(file) {
 
     if (!response.ok) throw new Error("Speichern fehlgeschlagen");
 
-    // 3. Erfolg!
-    // FIX: Link muss den Unterordner (/ghostshare/) beinhalten
     shareLink.value = `${window.location.origin}${window.location.pathname}?f=${encodeURIComponent(file.name)}`
     uploadSuccess.value = true
 
@@ -133,7 +127,7 @@ function triggerDownload() {
       <aside class="sidebar">
         <div class="brand">
           <div class="logo-icon">
-            <img src="./apple-touch-icon.png" alt="GhostShare Logo" />
+            <img :src="`${publicPath}apple-touch-icon.png`" alt="GhostShare Logo" />
           </div>
           <div class="brand-text">
             <div class="brand-title">GhostShare</div>
