@@ -1,11 +1,10 @@
 import { handleUpload } from '@vercel/blob/client';
 
 export const config = {
-  runtime: 'nodejs', // HIER GEÄNDERT: Von 'edge' zu 'nodejs'
+  runtime: 'nodejs',
 };
 
 export default async function handler(request, response) {
-  // In der Node.js Runtime wird der Body automatisch geparst, wenn er JSON ist
   const body = request.body;
 
   try {
@@ -24,9 +23,11 @@ export default async function handler(request, response) {
             'text/plain',
             'application/zip'
           ],
+          // WICHTIG: Hier erlauben wir explizit alle Optionen, die der Client senden könnte
           allowedRequestBodyOptions: [
             'addRandomSuffix',
-            'cacheControlMaxAge'
+            'cacheControlMaxAge',
+            'allowOverwrite'
           ],
           tokenPayload: JSON.stringify({
             // optional: user infos
@@ -38,10 +39,8 @@ export default async function handler(request, response) {
       },
     });
 
-    // Node.js Syntax für die Antwort
     response.status(200).json(jsonResponse);
   } catch (error) {
-    // Node.js Syntax für Fehler
     response.status(400).json({ error: error.message });
   }
 }

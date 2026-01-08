@@ -348,8 +348,11 @@ function triggerDownload() {
   padding: 8px;
   border-radius: 10px;
   transition: background-color 0.3s;
-  width: 40px; /* Beispielgröße */
-  height: 40px;
+  width: 80px;  /* <--- Hier größer machen */
+  height: 80px; /* <--- Hier größer machen */
+  display: flex; /* Hilft beim Zentrieren des Bildes */
+  align-items: center;
+  justify-content: center;
 }
 
 .logo-icon img {
