@@ -83,7 +83,6 @@ async function uploadFile(file) {
     const newBlob = await upload(file.name, file, {
       access: 'public',
       handleUploadUrl: `${BACKEND_URL}/api/blob-upload`,
-      addRandomSuffix: true
     });
 
     const response = await fetch(`${BACKEND_URL}/api/upload-meta`, {
