@@ -14,24 +14,17 @@ export default async function handler(request, response) {
       onBeforeGenerateToken: async (pathname) => {
         return {
           allowedContentTypes: [
-            'image/jpeg',
-            'image/png',
-            'image/gif',
-            'video/mp4',
-            'video/webm',
-            'application/pdf',
-            'text/plain',
-            'application/zip'
+            'image/jpeg', 'image/png', 'image/gif', 'video/mp4', 'video/webm',
+            'application/pdf', 'text/plain', 'application/zip'
           ],
-          // WICHTIG: Hier erlauben wir explizit alle Optionen, die der Client senden könnte
+          // HIER LIEGT DER FEHLER: Diese Liste muss alle Optionen enthalten, die dein Frontend sendet.
+          // Füge sicherheitshalber alle drei hinzu, die in der Fehlermeldung stehen.
           allowedRequestBodyOptions: [
             'addRandomSuffix',
             'cacheControlMaxAge',
             'allowOverwrite'
           ],
-          tokenPayload: JSON.stringify({
-            // optional: user infos
-          }),
+          tokenPayload: JSON.stringify({}),
         };
       },
       onUploadCompleted: async ({ blob, tokenPayload }) => {
